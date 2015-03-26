@@ -4,6 +4,7 @@ question: .ascii "Which function?\nThere are n functions. Type:\n\t 1 for sum\n\
 numInputs: .ascii "How many parameters?\n\0"
 enterInput: .ascii "Please input your parameters\n\0"
 newLine: .ascii "\n\0"
+space: .ascii " \0"
 
 sumDebug: .ascii "Calculating sum.\n\0"
 productDebug: .ascii "Calculating product.\n\0"
@@ -33,7 +34,7 @@ checkFunction:
 	beq $t0, 5, getParamCount
 	#beq $t0, 6, getParamCount
 	#beq $t0, 7, getParamCount
-	#beq $t0, 8, getParamCount
+	beq $t0, 8, getParamCount
 	#beq $t0, 9, matrixMult
 	j end
 
@@ -75,7 +76,7 @@ decideFunction:
 	beq $t0, 5, average
 	#beq $t0, 6, median
 	#beq $t0, 7, mode
-	#beq $t0, 8, sort
+	beq $t0, 8, sort
 
 ######## Sum
 		
@@ -102,11 +103,11 @@ product:
 	syscall
 	
 	add $t2, $zero, $zero # t2 is loop counter
-	add.d $f8, $f30, $f30 # 
-	addi $t3, $zero, 1
-	mtc1.d $t3, $f28
-	cvt.d.w $f28, $f28
-	add.d $f8, $f30, $f28
+	add.d $f8, $f30, $f30 # zeros out f8 - the answer 
+	addi $t3, $zero, 1 
+	mtc1.d $t3, $f28 # moves 1 to f28
+	cvt.d.w $f28, $f28 # converts f28 to double
+	add.d $f8, $f30, $f28 # add 1 to f8 because 0 times anything is 0
 	
 productLoop:
 	bge $t2, $t1, printAnswer
@@ -184,6 +185,45 @@ keepMax:
 	addi $t2, $t2, 1 # increment loop counter
 	j maxLoop
 	
+######## Sort
+
+sort:	
+	li $v0, 4          # service 4 is print string
+    	la $a0, sortDebug  # load desired value into argument register $a0, using pseudo-op
+	syscall
+	
+	addi $t3, $zero, 1 # t2 is loop counter
+	add $t7, $t6, $zero
+	
+sortOuterLoop:
+	bge $t3, $t1, printList
+	addi $t2, $zero, 1 # t2 is loop counter	
+	ldc1 $f6, 0($t6)
+sortInnerLoop:
+	bge $t2, $t1, endInnerLoop
+	add.d $f4, $f6, $f30
+	subi $t6, $t6, 8 # move pointer to previous input
+	ldc1 $f6, 0($t6)
+	c.lt.d $f6, $f4
+	bc1t swapInner
+	j noSwapInner
+	
+swapInner:
+	add.d $f10, $f4, $f30
+	add.d $f4, $f6, $f30
+	add.d $f6, $f10, $f30
+	
+noSwapInner:
+	sdc1 $f4, 8($t6)
+	sdc1 $f6, 0($t6)
+	addi $t2, $t2, 1 # increment inner loop counter
+	j sortInnerLoop
+
+endInnerLoop:
+	add $t6, $t7, $zero
+	addi $t3, $t3, 1 # increment outer loop counter
+	j sortOuterLoop
+
 ######## Average
 		
 average:	
@@ -215,6 +255,29 @@ printAnswer:
     	la $a0, newLine  # load desired value into argument register $a0, using pseudo-op
 	syscall
 
+	j ask
+	
+printList:
+	add $t2, $zero, $zero # t2 is loop counter
+#	subi $t6, $t6, 8
+	
+printOne:
+	bge $t2, $t1, printNewLine
+	ldc1 $f4, 0($t6)
+	subi $t6, $t6, 8 # move pointer to previous input
+	addi $t2, $t2, 1 # increment loop counter
+	li  $v0, 3          # service 3 is print double
+    	add.d $f12, $f4, $f30  # load desired value into argument register $f12
+	syscall
+	li $v0, 4         # service 4 is print string
+    	la $a0, space  # load desired value into argument register $a0, using pseudo-op
+	syscall
+	j printOne
+
+printNewLine:
+	li $v0, 4         # service 4 is print string
+    	la $a0, newLine  # load desired value into argument register $a0, using pseudo-op
+	syscall
 	j ask
 	
 end:	j end
