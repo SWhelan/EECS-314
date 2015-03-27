@@ -33,7 +33,7 @@ checkFunction:
 	beq $t0, 4, getParamCount
 	beq $t0, 5, getParamCount
 	#beq $t0, 6, getParamCount
-	#beq $t0, 7, getParamCount
+	beq $t0, 7, getParamCount
 	beq $t0, 8, getParamCount
 	#beq $t0, 9, matrixMult
 	j end
@@ -75,11 +75,12 @@ decideFunction:
 	beq $t0, 4, max
 	beq $t0, 5, average
 	#beq $t0, 6, median
-	#beq $t0, 7, mode
+	beq $t0, 7, mode
 	beq $t0, 8, sort
 
-######## Sum
-		
+
+######## Sum	
+	
 sum:	
 	li $v0, 4          # service 4 is print string
     	la $a0, sumDebug  # load desired value into argument register $a0, using pseudo-op
@@ -94,6 +95,7 @@ sumLoop:
 	subi $t6, $t6, 8 # move pointer to previous input
 	addi $t2, $t2, 1 # increment loop counter
 	j sumLoop
+
 
 ######## Product
 		
@@ -116,6 +118,7 @@ productLoop:
 	subi $t6, $t6, 8 # move pointer to previous input
 	addi $t2, $t2, 1 # increment loop counter
 	j productLoop
+	
 	
 ######## Min
 		
@@ -151,6 +154,7 @@ keepMin:
 	addi $t2, $t2, 1 # increment loop counter
 	j minLoop
 	
+	
 ######## Max
 		
 max:	
@@ -184,7 +188,8 @@ keepMax:
 	sub $t6, $t6, 8 # decrement heap pointer
 	addi $t2, $t2, 1 # increment loop counter
 	j maxLoop
-	
+
+
 ######## Sort
 
 sort:	
@@ -196,14 +201,14 @@ sort:
 	add $t7, $t6, $zero
 	
 sortOuterLoop:
-	bge $t3, $t1, printList
+	bge $t3, $t1, modeOrPrint
 	addi $t2, $zero, 1 # t2 is loop counter	
-	ldc1 $f6, 0($t6)
+	ldc1 $f6, 0($t7)
 sortInnerLoop:
 	bge $t2, $t1, endInnerLoop
 	add.d $f4, $f6, $f30
-	subi $t6, $t6, 8 # move pointer to previous input
-	ldc1 $f6, 0($t6)
+	subi $t7, $t7, 8 # move pointer to previous input
+	ldc1 $f6, 0($t7)
 	c.lt.d $f6, $f4
 	bc1t swapInner
 	j noSwapInner
@@ -214,15 +219,20 @@ swapInner:
 	add.d $f6, $f10, $f30
 	
 noSwapInner:
-	sdc1 $f4, 8($t6)
-	sdc1 $f6, 0($t6)
+	sdc1 $f4, 8($t7)
+	sdc1 $f6, 0($t7)
 	addi $t2, $t2, 1 # increment inner loop counter
 	j sortInnerLoop
 
 endInnerLoop:
-	add $t6, $t7, $zero
+	add $t7, $t6, $zero
 	addi $t3, $t3, 1 # increment outer loop counter
 	j sortOuterLoop
+
+modeOrPrint:
+	beq $t0, 7, modeInit
+	j printList
+
 
 ######## Average
 		
@@ -245,6 +255,70 @@ divideByTotal:
 	mtc1.d $t1, $f6 # move total number of inputs to f6
 	cvt.d.w $f6, $f6 # convert f6 to double
 	div.d $f8, $f2, $f6 # f8 is average
+	j printAnswer
+
+
+######## Mode
+
+mode:
+	j sort
+modeInit:
+	li $v0, 4          # service 4 is print string
+    	la $a0, modeDebug  # load desired value into argument register $a0, using pseudo-op
+	syscall
+
+	add $t2, $zero, $zero # t2 is loop counter
+	add $t3, $zero, $zero # t3 will be highest count
+	add $t4, $zero, $zero # t4 will be current count
+	add $t5, $zero, $zero # t5 is the number of mode values we need to print
+	add $t7, $t6, $zero # t7 will be the pointer for internal use in the inputs
+	addi $s0, $t6, 8 # s0 will be the pointer for storing which values need to be printed
+	ldc1 $f8, 0($t7) # f8 will be the previous value
+	
+modeLoop:
+	bge $t2, $t1, printModeList
+	ldc1 $f4, 0($t7) # f4 is the current value
+	c.eq.d $f4, $f8
+	bc1f newValue # if the current value is not the same as the last value we looked at 
+	j sameValue
+	
+newValue:
+	add $t4, $zero, $zero # set the current counter to 0; will increment in the next line
+	#sdc1 $f8, 0($s0)
+	#addi $s0, $s0, 8
+	
+sameValue:
+	addi $t4, $t4, 1 #increment the current count
+	
+	# now check if the current count is equal to or greater than the highest count
+	bgt $t4, $t3, counterGreater # if the current count is greater than the highest count
+	j checkEqual
+	
+counterGreater:
+	add $s0, $zero, $t6 # get rid of all previously stored modes by resettingn the pointer to the modes to print
+	addi $t5, $zero, 1 # set the number of values that need to be printed to 1
+	sdc1 $f4, 0($s0) # make the current value the first value to be printed
+	addi $s0, $s0, 8 # increment the s0 pointer
+	add $t3, $t4, $zero
+	j finishLoop
+
+checkEqual:
+	beq $t3, $t4, counterEqual
+	j finishLoop
+	
+counterEqual:	
+	addi $t5, $t5, 1 # increment the number of values that need to be printed
+	sdc1 $f4, 0($s0) # add this value to the list of what needs to be printed
+	addi $s0, $s0, 8 # increment the s0 pointer
+	
+finishLoop:
+	add.d $f8, $f4, $f30 # save the current value as the previous value
+	subi $t7, $t7, 8 # go to next input
+	addi $t2, $t2, 1 # increment loop counter
+	j modeLoop
+	
+	
+######## Print	
 		
 printAnswer:
 	li  $v0, 3          # service 4 is print string
@@ -256,10 +330,9 @@ printAnswer:
 	syscall
 
 	j ask
-	
+		
 printList:
 	add $t2, $zero, $zero # t2 is loop counter
-#	subi $t6, $t6, 8
 	
 printOne:
 	bge $t2, $t1, printNewLine
@@ -274,10 +347,26 @@ printOne:
 	syscall
 	j printOne
 
+printModeList:
+	add $t2, $zero, $zero # t2 is loop counter
+	
+printOneMode:
+	bge $t2, $t5, printNewLine #t5 is the number of modes to print
+	ldc1 $f4, 0($t6)
+	addi $t6, $t6, 8 # move pointer to next printy thing
+	addi $t2, $t2, 1 # increment loop counter
+	li  $v0, 3       # service 3 is print double
+    	add.d $f12, $f4, $f30  # load desired value into argument register $f12
+	syscall
+	li $v0, 4      # service 4 is print string
+    	la $a0, space  # load desired value into argument register $a0, using pseudo-op
+	syscall
+	j printOneMode
+
 printNewLine:
 	li $v0, 4         # service 4 is print string
     	la $a0, newLine  # load desired value into argument register $a0, using pseudo-op
 	syscall
-	j ask
+	#j ask
 	
 end:	j end
