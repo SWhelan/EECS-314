@@ -32,7 +32,7 @@ checkFunction:
 	beq $t0, 3, getParamCount
 	beq $t0, 4, getParamCount
 	beq $t0, 5, getParamCount
-	#beq $t0, 6, getParamCount
+	beq $t0, 6, getParamCount
 	beq $t0, 7, getParamCount
 	beq $t0, 8, getParamCount
 	#beq $t0, 9, matrixMult
@@ -74,7 +74,7 @@ decideFunction:
 	beq $t0, 3, min
 	beq $t0, 4, max
 	beq $t0, 5, average
-	#beq $t0, 6, median
+	beq $t0, 6, median
 	beq $t0, 7, mode
 	beq $t0, 8, sort
 
@@ -96,7 +96,6 @@ sumLoop:
 	addi $t2, $t2, 1 # increment loop counter
 	j sumLoop
 
-
 ######## Product
 		
 product:	
@@ -107,7 +106,7 @@ product:
 	add $t2, $zero, $zero # t2 is loop counter
 	add.d $f8, $f30, $f30 # zeros out f8 - the answer 
 	addi $t3, $zero, 1 
-	mtc1.d $t3, $f28 # moves 1 to f28
+	mtc1 $t3, $f28 # moves 1 to f28
 	cvt.d.w $f28, $f28 # converts f28 to double
 	add.d $f8, $f30, $f28 # add 1 to f8 because 0 times anything is 0
 	
@@ -231,6 +230,7 @@ endInnerLoop:
 
 modeOrPrint:
 	beq $t0, 7, modeInit
+	beq $t0, 6, medianInit
 	j printList
 
 
@@ -252,12 +252,60 @@ averageLoop:
 	j averageLoop
 
 divideByTotal:
-	mtc1.d $t1, $f6 # move total number of inputs to f6
+	mtc1 $t1, $f6 # move total number of inputs to f6
 	cvt.d.w $f6, $f6 # convert f6 to double
 	div.d $f8, $f2, $f6 # f8 is average
 	j printAnswer
 
+######## Median
+median:
+	j sort
+medianInit:
+	li $v0, 4          # service 4 is print string
+    	la $a0, medianDebug  # load desired value into argument register $a0, using pseudo-op
+	syscall
+	
+	addi $t3, $zero, 2 # two
+	div $t1, $t3 # divide total number of arguments by two
+	mfhi $t3 # the remainder in t3
+	mflo $t4 # lo is the quotient
+	add $t7, $t6, $zero # t7 will be the pointer for internal use in the inputs
+	beq $t3, $zero, medianEven # if the remainder is zero there is an even number of arguments
+	j medianOdd
+	
+medianOdd:
+	add $t2, $zero, $zero # t2 is loop counter
+medianOddLoop:
+	beq $t2, $t4, setOddMedian # loop until reach index of median
+	subi $t7, $t7, 8 # change the pointer
+	addi $t2, $t2, 1 # increment loop counter
+	j medianOddLoop
 
+setOddMedian:
+	ldc1 $f8, 0($t7) # load median value into f8
+	j printAnswer
+	
+medianEven:
+	add $t2, $zero, $zero # t2 is loop counter
+	addi $t4, $t4, -1 # have to add one because we want the number after the division
+medianEvenLoop:
+	beq $t2, $t4, setEvenMedian	
+	subi $t7, $t7, 8
+	addi $t2, $t2, 1
+	j medianEvenLoop
+	
+setEvenMedian:
+	addi $t3, $zero, 2 # two
+	ldc1 $f2, 0($t7) # load first value needed for median
+	subi $t7, $t7, 8 # set pointer to second value needed for median
+	ldc1 $f4, 0($t7) # load second value needed for median
+	add.d $f6, $f2, $f4 # add two values needed for median
+	mtc1 $t3, $f10 # move the number two to f10
+	cvt.d.w $f10, $f10 # convert the number two, an integer, to double precision
+	div.d $f8, $f6, $f10 # divide the sum by two and place value in f8 for printing
+	
+	j printAnswer
+	
 ######## Mode
 
 mode:
