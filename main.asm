@@ -1,20 +1,21 @@
 main:
 	.data
-question: .ascii "Which function?\nThere are n functions. Type:\n\t 1 for sum\n\t 2 for product\n\t 3 for min\n\t 4 for max\n\t 5 for average\n\t 6 for median\n\t 7 for mode\n\t 8 for sort\n\t 9 for matrix multiply\n\t -1 to exit program\n\0"
-numInputs: .ascii "How many parameters?\n\0"
-enterInput: .ascii "Please input your parameters\n\0"
-newLine: .ascii "\n\0"
-space: .ascii " \0"
+question: .asciiz "Which function?\nThere are n functions. Type:\n\t 1 for sum\n\t 2 for product\n\t 3 for min\n\t 4 for max\n\t 5 for average\n\t 6 for median\n\t 7 for mode\n\t 8 for sort\n\t 9 for matrix multiply\n\t -1 to exit program\n"
+numInputs: .asciiz "How many parameters?\n"
+enterInput: .asciiz "Please input your parameters\n"
+enterMatrix: .asciiz "Please input a matrix in the form {(1 2 3),(4 5 6)}.\n"
+newLine: .asciiz "\n"
+space: .asciiz " "
 
-sumDebug: .ascii "Calculating sum.\n\0"
-productDebug: .ascii "Calculating product.\n\0"
-minDebug: .ascii "Calculating min.\n\0"
-maxDebug: .ascii "Calculating max.\n\0"
-averageDebug: .ascii "Calculating average.\n\0"
-medianDebug: .ascii "Calculating median.\n\0"
-modeDebug: .ascii "Calculating mode.\n\0"
-sortDebug: .ascii "Sorting.\n\0"
-matrixMultDebug: .ascii "Matrix multiplying.\n\0"
+sumDebug: .asciiz "Calculating sum.\n"
+productDebug: .asciiz "Calculating product.\n"
+minDebug: .asciiz "Calculating min.\n"
+maxDebug: .asciiz "Calculating max.\n"
+averageDebug: .asciiz "Calculating average.\n"
+medianDebug: .asciiz "Calculating median.\n"
+modeDebug: .asciiz "Calculating mode.\n"
+sortDebug: .asciiz "Sorting.\n"
+matrixMultDebug: .asciiz "Matrix multiplying.\n"
 
 	.text
 ask:	li  $v0, 4          # service 4 is print string
@@ -25,6 +26,7 @@ ask:	li  $v0, 4          # service 4 is print string
 	syscall
 	
 	add $t0, $v0, $zero  # the function they want is in t0
+	la $t6, 0($gp) # t6 points to the global pointer which points to the heap
 	
 checkFunction:
 	beq $t0, 1, getParamCount
@@ -35,7 +37,7 @@ checkFunction:
 	beq $t0, 6, getParamCount
 	beq $t0, 7, getParamCount
 	beq $t0, 8, getParamCount
-	#beq $t0, 9, matrixMult
+	beq $t0, 9, matrixMult
 	j end
 
 getParamCount:
@@ -54,8 +56,6 @@ getParamCount:
 	
 	addi $t2, $zero, 1 # the loop counter is t2
 	
-	la $t6, 0($gp) # t6 points to the global pointer which points to the heap
-	
 getInput:
 	bgt $t2, $t1, decideFunction
 	li  $v0, 7         # service 7 is get double
@@ -66,7 +66,7 @@ getInput:
 	addi $t6, $t6, 8 # increment pointer
 	addi $t2, $t2, 1 # incrementing loop counter
 	j getInput
-	
+
 decideFunction:
 	addi $t6, $t6, -8 # decrement pointer
 	beq $t0, 1, sum
@@ -78,6 +78,119 @@ decideFunction:
 	beq $t0, 7, mode
 	beq $t0, 8, sort
 
+matrixMult:
+	li  $v0, 4          # service 4 is print string
+    	la $a0, enterMatrix # load desired value into argument register $a0, using pseudo-op
+	syscall
+	
+	li $v0, 8 # ask nicely for a string
+	lui $t1, 0x1004
+	ori $t1, 0x0000
+	la $a0, 0($t1)
+	li $a1, 100000
+	syscall
+	
+	lb $t2, 0($t1)
+	addi $t5, $zero, 10 #store ten in a temp
+	mtc1 $t5, $f0 # move ten to a floating point
+	cvt.d.w $f0, $f0 #f0 has ten
+	addi $t5, $zero, -1 #store -1 in a temp
+	mtc1 $t5, $f6 # move -1 to a floating point
+	cvt.d.w $f6, $f6 #f0 has negative 1
+	
+	
+stringConvertLoop:
+	beq $t2, '\0', endOfString
+	beq $t2, '-', negative
+	beq $t2, ')', newNumber
+	beq $t2, ' ', newNumber
+	beq $t2, ',', getNextChar
+	beq $t2, '{', getNextChar
+	beq $t2, '(', rowCount
+	beq $t2, '}', getNextChar
+	j digit
+	
+rowCount:
+	addi $t4, $t4, 1 #t4 is the number of rows
+	j getNextChar
+	
+digit:
+	addi $t5, $t5, 1 # add one to the count for after the radix point
+	beq $t2, '.', radixPoint
+	addi $t2, $t2, -48
+	mtc1 $t2, $f4
+	cvt.d.w $f4, $f4 # the current digit is in f4
+	add.d $f2, $f2, $f4 # add current digit to f2
+	mul.d $f2, $f2, $f0 # multiply by ten
+	j getNextChar
+
+radixPoint:
+	add $t5, $zero, $zero
+	addi $t8, $zero, 1 #flag for radix point
+	j getNextChar
+	
+negative:
+	addi $t9, $zero, 1 #flag for negative numbers
+	j getNextChar
+	
+newNumber:
+	addi $t3, $t3, 1 # increment total number of numbers
+	bne $t8, 1, noRadix
+	
+divByTenLoop:
+	blt $t5, $zero, store # divide our current number by ten the number of digits after the radix point + 1
+	div.d $f2, $f2, $f0 
+	addi $t5, $t5, -1
+	j divByTenLoop
+	
+noRadix:
+	div.d $f2, $f2, $f0 
+
+store:
+	beq $t9, 0, isPositive
+	mul.d $f2, $f2, $f6
+isPositive:
+	add $t8, $zero, $zero
+	add $t9, $zero, $zero
+	add $t5, $zero, $zero
+
+	li  $v0, 3          # service 4 is print string
+    	add.d $f12, $f2, $f30  # load desired value into argument register $a0, using pseudo-op
+	syscall
+
+	li $v0, 4         # service 4 is print string
+    	la $a0, newLine  # load desired value into argument register $a0, using pseudo-op
+	syscall
+	
+	sdc1 $f2, ($t6)
+	addi $t6, $t6, 8 # increment pointer
+	add.d $f2, $f30, $f30
+	
+getNextChar:
+	addi $t1, $t1, 1 # increment address pointer
+	lb $t2, 0($t1) #load next character
+	j stringConvertLoop
+	
+endOfString:
+	div $t3, $t4
+	mflo $t3
+	li  $v0, 1          # service 4 is print string
+    	add $a0, $t3, $zero   # load desired value into argument register $a0, using pseudo-op
+	syscall
+
+	li $v0, 4         # service 4 is print string
+    	la $a0, newLine  # load desired value into argument register $a0, using pseudo-op
+	syscall
+	
+	li  $v0, 1          # service 4 is print string
+    	add $a0, $t4, $zero   # load desired value into argument register $a0, using pseudo-op
+	syscall
+
+	li $v0, 4         # service 4 is print string
+    	la $a0, newLine  # load desired value into argument register $a0, using pseudo-op
+	syscall
+	#at end of loop t3 will have number of columns and t4 will have number of rows
+	j ask
 
 ######## Sum	
 	
@@ -369,7 +482,7 @@ finishLoop:
 ######## Print	
 		
 printAnswer:
-	li  $v0, 3          # service 4 is print string
+	li  $v0, 3          # service 3 is print double
     	add.d $f12, $f8, $f30  # load desired value into argument register $a0, using pseudo-op
 	syscall
 
