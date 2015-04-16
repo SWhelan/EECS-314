@@ -1,7 +1,8 @@
 main:
 	.data
-question: .asciiz "Which function?\nThere are n functions. Type:\n\t 1 for sum\n\t 2 for product\n\t 3 for min\n\t 4 for max\n\t 5 for average\n\t 6 for median\n\t 7 for mode\n\t 8 for sort\n\t 9 for matrix multiply\n\t -1 to exit program\n"
+question: .asciiz "Which function?\nThere are n functions. Type:\n\t 1 for sum\n\t 2 for product\n\t 3 for min\n\t 4 for max\n\t 5 for average\n\t 6 for median\n\t 7 for mode\n\t 8 for sort\n\t 9 for scalar matrix multiplication\n\t 10 for matrix multiply\n\t -1 to exit program\n"
 numInputs: .asciiz "How many parameters?\n"
+inputScalar: .asciiz "Please enter scalar:\n"
 enterInput: .asciiz "Please input your parameters\n"
 enterMatrix: .asciiz "Please input a matrix in the form {(1 2 3),(4 5 6)}.\n"
 newLine: .asciiz "\n"
@@ -37,7 +38,8 @@ checkFunction:
 	beq $t0, 6, getParamCount
 	beq $t0, 7, getParamCount
 	beq $t0, 8, getParamCount
-	beq $t0, 9, matrixMult
+	beq $t0, 9, matrixScalar
+	beq $t0, 10, matrixMult
 	j end
 
 getParamCount:
@@ -61,7 +63,7 @@ getInput:
 	li  $v0, 7         # service 7 is get double
 	syscall
 	
-	add.d $f2, $f0, $f30  # the input value is in f1
+	add.d $f2, $f0, $f30  # the input value is in f2
 	sdc1 $f2, 0($t6) # store the input on heap
 	addi $t6, $t6, 8 # increment pointer
 	addi $t2, $t2, 1 # incrementing loop counter
@@ -78,7 +80,40 @@ decideFunction:
 	beq $t0, 7, mode
 	beq $t0, 8, sort
 
+matrixScalar:
+	jal inputMatrix
+	li  $v0, 4          # service 4 is print string
+    	la $a0, inputScalar  # load desired value into argument register $a0, using pseudo-op
+	syscall
+	
+	li  $v0, 7         # service 7 is get double
+	syscall
+	add.d $f2, $f0, $f30  # the input value is in f2
+	add $t7, $zero, $t6
+scalarMultiplyMatrix:
+	add $t1, $zero, $zero # outer(Row) loop counter
+	add $t2, $zero, 1 # inner (Column) loop counter
+rowMultLoop:
+	beq $t1, $t4, stoopMult
+columnMultLoop:
+	bgt $t2, $t3, endRowMultLoop
+	ldc1 $f8, 0($t7)
+	mul.d $f8, $f8, $f2
+	sdc1 $f8, 0($t7)
+	addi $t7, $t7, 8
+	addi $t2, $t2, 1
+	j columnMultLoop
+endRowMultLoop:
+	addi $t2, $zero, 1 # inner (Column) loop counter
+	addi $t1, $t1, 1
+	j rowMultLoop
+	
+stoopMult:
+	jal printMatrix
+	j ask
 matrixMult:
+inputMatrix:
+	add $t7, $zero, $t6
 	li  $v0, 4          # service 4 is print string
     	la $a0, enterMatrix # load desired value into argument register $a0, using pseudo-op
 	syscall
@@ -162,8 +197,8 @@ isPositive:
     	la $a0, newLine  # load desired value into argument register $a0, using pseudo-op
 	syscall
 	
-	sdc1 $f2, ($t6)
-	addi $t6, $t6, 8 # increment pointer
+	sdc1 $f2, ($t7)
+	addi $t7, $t7, 8 # increment pointer
 	add.d $f2, $f30, $f30
 	
 getNextChar:
@@ -190,7 +225,50 @@ endOfString:
     	la $a0, newLine  # load desired value into argument register $a0, using pseudo-op
 	syscall
 	#at end of loop t3 will have number of columns and t4 will have number of rows
-	j ask
+	jr $ra
+	
+######## Print Matrix
+
+printMatrix:
+	sw $ra, 0($sp)
+	add $t7, $zero, $t6
+	li $v0, 11
+	addi $a0, $zero, '{'
+	syscall
+	
+	add $t1, $zero, $zero # outer(Row) loop counter
+	add $t2, $zero, 1 # inner (Column) loop counter
+rowLoop:
+	beq $t1, $t4, stoop
+	li $v0, 11
+	addi $a0, $zero, '('
+	syscall
+columnLoop:
+	bgt $t2, $t3, endRowLoop
+	ldc1 $f8, 0($t7)
+	addi $t7, $t7, 8
+	jal printAnswer
+	beq $t2, $t3, noSpace
+	jal printSpace
+noSpace:
+	addi $t2, $t2, 1
+	j columnLoop
+endRowLoop:
+	li $v0, 11
+	addi $a0, $zero, ')'
+	syscall
+	addi $t2, $zero, 1 # inner (Column) loop counter
+	addi $t1, $t1, 1
+	j rowLoop
+	
+stoop:
+	li $v0, 11
+	addi $a0, $zero, '}'
+	syscall
+	jal printNewLine
+	lw $ra, 0($sp)
+	jr $ra
+	
 
 ######## Sum	
 	
@@ -202,7 +280,7 @@ sum:
 	add $t2, $zero, $zero # t2 is loop counter
 	add.d $f8, $f30, $f30 # cleared sum for some reason
 sumLoop:	
-	bge $t2, $t1, printAnswer
+	bge $t2, $t1, printAnswerWithNewLine
 	ldc1 $f4, 0($t6)
 	add.d $f8, $f8, $f4 # adds current number to sum is in f8
 	subi $t6, $t6, 8 # move pointer to previous input
@@ -396,7 +474,8 @@ medianOddLoop:
 
 setOddMedian:
 	ldc1 $f8, 0($t7) # load median value into f8
-	j printAnswer
+	jal printAnswerWithNewLine
+	j ask
 	
 medianEven:
 	add $t2, $zero, $zero # t2 is loop counter
@@ -417,7 +496,8 @@ setEvenMedian:
 	cvt.d.w $f10, $f10 # convert the number two, an integer, to double precision
 	div.d $f8, $f6, $f10 # divide the sum by two and place value in f8 for printing
 	
-	j printAnswer
+	jal printAnswerWithNewLine
+	j ask
 	
 ######## Mode
 
@@ -485,12 +565,28 @@ printAnswer:
 	li  $v0, 3          # service 3 is print double
     	add.d $f12, $f8, $f30  # load desired value into argument register $a0, using pseudo-op
 	syscall
-
+	jr $ra
+	
+printNewLine:
 	li $v0, 4         # service 4 is print string
     	la $a0, newLine  # load desired value into argument register $a0, using pseudo-op
 	syscall
+	jr $ra
+	
+printAnswerWithNewLine:
+	li  $v0, 3          # service 3 is print double
+    	add.d $f12, $f8, $f30  # load desired value into argument register $a0, using pseudo-op
+	syscall
+	li $v0, 4         # service 4 is print string
+    	la $a0, newLine  # load desired value into argument register $a0, using pseudo-op
+	syscall
+	jr $ra
 
-	j ask
+printSpace:
+	li $v0, 11         # service 4 is print string
+    	addi $a0, $zero ' '  
+	syscall
+	jr $ra
 		
 printList:
 	add $t2, $zero, $zero # t2 is loop counter
@@ -512,7 +608,7 @@ printModeList:
 	add $t2, $zero, $zero # t2 is loop counter
 	
 printOneMode:
-	bge $t2, $t5, printNewLine #t5 is the number of modes to print
+	bge $t2, $t5, printNewLineMode #t5 is the number of modes to print
 	ldc1 $f4, 0($t6)
 	addi $t6, $t6, 8 # move pointer to next printy thing
 	addi $t2, $t2, 1 # increment loop counter
@@ -524,10 +620,10 @@ printOneMode:
 	syscall
 	j printOneMode
 
-printNewLine:
+printNewLineMode:
 	li $v0, 4         # service 4 is print string
     	la $a0, newLine  # load desired value into argument register $a0, using pseudo-op
 	syscall
-	#j ask
+	j ask
 	
 end:	j end
