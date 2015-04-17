@@ -7,6 +7,9 @@ enterInput: .asciiz "Please input your parameters\n"
 enterMatrix: .asciiz "Please input a matrix in the form {(1 2 3),(4 5 6)}.\n"
 newLine: .asciiz "\n"
 space: .asciiz " "
+A: .asciiz "Current A: "
+B: .asciiz "current m2: "
+P: .asciiz "Current product: "
 
 sumDebug: .asciiz "Calculating sum.\n"
 productDebug: .asciiz "Calculating product.\n"
@@ -80,6 +83,8 @@ decideFunction:
 	beq $t0, 7, mode
 	beq $t0, 8, sort
 
+######## Scalar Matrix Multiplication
+
 matrixScalar:
 	jal inputMatrix
 	li  $v0, 4          # service 4 is print string
@@ -111,8 +116,121 @@ endRowMultLoop:
 stoopMult:
 	jal printMatrix
 	j ask
+
+######## Matrix Multiplication
 matrixMult:
+	jal inputMatrix
+	add $t6, $zero, $t7 #resets value for next input matrix
+	add $s0, $zero, $t7 # s0 is the pointer to the second matrix
+	add $s1, $zero, $t3 # s1 is the number of columns in the first matrix
+	add $s2, $zero, $t4 # s2 is the number of rows in the first matrix
+								
+	jal inputMatrix
+	add $s3, $zero, $t7 # s3 is the pointer to the product
+	add $s4, $zero, $t3 # s4 is the number of columns in the second matrix 
+	add $s5, $zero, $t4 # s5 is the number of rows in the second matrix
+	add $t4, $zero, $gp #t4 is pointer to m1
+	add $t5, $zero, $s0 #t5 is pointer to m2
+	add $t6, $zero, $s3 #t6 is pointer to product
+	# use to reset t4, t5, t6: the global pointer points to the beginning of the first s0 points to the second and $s3 points to the product
+	
+	add $t1, $zero, $zero #t1 is a loop counter for outerloop which is the number of rows in the first matrix
+m1RowLoop: # each m1RowLoop makes a whole row of the product
+	# the outer loop goes for the number of rows in the first matrix
+	beq $t1, $s2, dune
+	add $t2, $zero, $zero #t2 is the loop counter for the number of columns in matrix one
+m1ColumnLoop: #makes 1/s1 of the value of the product for one row of the product
+	beq $t2, $s1, m1ColumnLoopEnd
+	add $t3, $zero, $zero #t3 is the loop counter for the number of columns in matrix 2
+m2ColumnLoop: 
+	beq $t3, $s4, m2ColumnLoopEnd
+	ldc1 $f2, 0($t4)
+	ldc1 $f4, 0($t5)
+	ldc1 $f6, 0($t6)
+	
+					li $v0, 4         # service 4 is print string
+    	la $a0, A  # load desired value into argument register $a0, using pseudo-op
+	syscall
+	li $v0, 3         # service 3 is print double
+    	add.d $f12, $f2, $f30  # load desired value into argument register $a0, using pseudo-op
+	syscall
+
+		li $v0, 4         # service 4 is print string
+    	la $a0, newLine  # load desired value into argument register $a0, using pseudo-op
+	syscall
+			li $v0, 4         # service 4 is print string
+    	la $a0, B  # load desired value into argument register $a0, using pseudo-op
+	syscall
+	li $v0, 3         # service 4 is print string
+    	add.d $f12, $f4, $f30  # load desired value into argument register $a0, using pseudo-op
+	syscall
+	li $v0, 4         # service 4 is print string
+    	la $a0, newLine  # load desired value into argument register $a0, using pseudo-op
+	syscall
+			li $v0, 4         # service 4 is print string
+    	la $a0, P  # load desired value into argument register $a0, using pseudo-op
+	syscall
+	li $v0, 3         # service 4 is print string
+    	add.d $f12, $f6, $f30  # load desired value into argument register $a0, using pseudo-op
+	syscall
+
+		li $v0, 4         # service 4 is print string
+    	la $a0, newLine  # load desired value into argument register $a0, using pseudo-op
+	syscall
+	
+	
+	mul.d $f8, $f2, $f4
+	add.d $f8, $f8, $f6
+	sdc1 $f8, 0($t6)
+	addi $t6, $t6, 8 #pointer to product increment
+	addi $t3, $t3, 1
+	addi $t5, $t5, 8 #increment pointer to m2
+	j m2ColumnLoop
+
+m2ColumnLoopEnd:
+	addi $t4, $t4, 8 #increment pointer to m1
+	# reset pointer to product to beginning of current row
+	addi $t8, $zero, 8
+	mult $t8, $s4
+	mflo $t8
+	sub $t6, $t6, $t8
+	### end reset
+	addi $t2, $t2, 1
+	j m1ColumnLoop
+	
+m1ColumnLoopEnd:
+	add $t5, $s0, $zero # reset pointer to m2
+	addi $t1, $t1, 1
+	add $t6, $t6, $t8
+	j m1RowLoop
+	
+dune:
+	add $t6, $t7, $zero # the pointer for print matrix
+	add $t4, $zero, $s2
+	add $t3, $zero, $s4
+	jal printMatrix
+	j ask
+
+####  Input Matrix	
 inputMatrix:
+	# zero out EVERYTHING
+	add $t1, $zero, $zero 
+	add $t2, $zero, $zero 
+	add $t3, $zero, $zero
+	add $t4, $zero, $zero
+	add $t5, $zero, $zero
+	add $t8, $zero, $zero 
+	add $t9, $zero, $zero 
+	add.d $f0, $f30, $f30
+	add.d $f2, $f30, $f30
+	add.d $f4, $f30, $f30
+	add.d $f6, $f30, $f30
+	add.d $f8, $f30, $f30
+	add.d $f10, $f30, $f30
+	add.d $f12, $f30, $f30
+	add.d $f14, $f30, $f30
+	
+	
 	add $t7, $zero, $t6
 	li  $v0, 4          # service 4 is print string
     	la $a0, enterMatrix # load desired value into argument register $a0, using pseudo-op
@@ -246,8 +364,9 @@ rowLoop:
 columnLoop:
 	bgt $t2, $t3, endRowLoop
 	ldc1 $f8, 0($t7)
-	addi $t7, $t7, 8
 	jal printAnswer
+	sdc1 $f30, 0($t7)
+	addi $t7, $t7, 8
 	beq $t2, $t3, noSpace
 	jal printSpace
 noSpace:
