@@ -67,7 +67,7 @@ getInput:
 	add.d $f2, $f0, $f30  # the input value is in f2
 	sdc1 $f2, 0($t6) # store the input on heap
 	addi $t6, $t6, 8 # increment pointer
-	addi $t2, $t2, 1 # incrementing loop counter
+	addi $t2, $t2, 1 # increment loop counter
 	j getInput
 
 endInput:
@@ -132,7 +132,7 @@ rowCount:
 	j getNextChar
 	
 digit:
-	addi $t5, $t5, 1 # add one to the count for after the radix point
+	addi $t5, $t5, 1 # add one to the count of digits after the radix point
 	beq $t2, '.', radixPoint
 	addi $t2, $t2, -48	# the offset for ascii values
 	mtc1 $t2, $f4
@@ -143,25 +143,25 @@ digit:
 
 radixPoint:
 	add $t5, $zero, $zero
-	addi $t8, $zero, 1 #flag for radix point
+	addi $t8, $zero, 1 #t8 is flag for radix point
 	j getNextChar
 	
 negative:
-	addi $t9, $zero, 1 #flag for negative numbers
+	addi $t9, $zero, 1 #t9 is flag for negative numbers
 	j getNextChar
 	
 newNumber:
-	addi $t3, $t3, 1 # increment total number of numbers
+	addi $t3, $t3, 1 # increment total number of numbers in matrix
 	bne $t8, 1, noRadix
 	
 divByTenLoop:
-	blt $t5, $zero, store # divide our current number by ten the number of digits after the radix point + 1
+	blt $t5, $zero, store # loop (the number of digits after the radix point +1) times, dividing by ten each time
 	div.d $f2, $f2, $f0 
 	addi $t5, $t5, -1
 	j divByTenLoop
 	
 noRadix:
-	div.d $f2, $f2, $f0 
+	div.d $f2, $f2, $f0 # divide one more time 
 
 store:
 	beq $t9, 0, isPositive
@@ -183,7 +183,7 @@ getNextChar:
 endOfString:
 	div $t3, $t4
 	mflo $t3
-	#at end of loop t3 will have number of columns and t4 will have number of rows
+	# at end of loop t3 will have number of columns and t4 will have number of rows
 	jr $ra
 	
 
@@ -197,12 +197,12 @@ sum:
 	syscall
 	
 	add $t2, $zero, $zero # t2 is loop counter
-	add.d $f8, $f30, $f30 # cleared sum for some reason
+	add.d $f8, $f30, $f30
 
 sumLoop:	
 	bge $t2, $t1, endSum
 	ldc1 $f4, 0($t6)
-	add.d $f8, $f8, $f4 # adds current number to sum is in f8
+	add.d $f8, $f8, $f4 # add current number to sum is in f8
 	addi $t6, $t6, -8 # move pointer to previous input
 	addi $t2, $t2, 1 # increment loop counter
 	j sumLoop
@@ -210,6 +210,7 @@ sumLoop:
 endSum:
 	jal printAnswerWithNewLine
 	j ask
+
 
 ######## Product
 		
@@ -221,16 +222,16 @@ product:
 	syscall
 	
 	add $t2, $zero, $zero # t2 is loop counter
-	add.d $f8, $f30, $f30 # zeros out f8 - the answer 
+	add.d $f8, $f30, $f30 # zero out f8, the answer 
 	addi $t3, $zero, 1 
-	mtc1 $t3, $f28 # moves 1 to f28
-	cvt.d.w $f28, $f28 # converts f28 to double
+	mtc1 $t3, $f28 # move 1 to f28
+	cvt.d.w $f28, $f28 # convert f28 to double
 	add.d $f8, $f30, $f28 # add 1 to f8 because 0 times anything is 0
 	
 productLoop:
 	bge $t2, $t1, endProduct
 	ldc1 $f4, 0($t6)
-	mul.d $f8, $f8, $f4 # multiplies current product with current input
+	mul.d $f8, $f8, $f4 # multiply current product with current input
 	addi $t6, $t6, -8 # move pointer to previous input
 	addi $t2, $t2, 1 # increment loop counter
 	j productLoop
@@ -250,9 +251,9 @@ min:
 	syscall
 	
 	add $t2, $zero, $zero # t2 is loop counter
-	add.d $f8, $f30, $f30 # cleared sum for some reason
+	add.d $f8, $f30, $f30
 	
-	### Stores Infinity in $f8 ###
+	### Stores infinity in $f8 ###
 	lui $t3, 0x7FF0 
 	ori $t3, 0x0000
 	add $t4, $zero, $zero
@@ -265,11 +266,11 @@ minLoop:
   	beq $t2, $t1, endMin
 	ldc1 $f10, 0($t6) # load the current input into f10
 	
-    	c.lt.d $f8, $f10 # set floating point conditional to true if current min is less than input
+    	c.lt.d $f8, $f10 # set floating point condition flag to true if current min is less than input
     	bc1t keepMin # if current min < input don't change the current min
 	
 changeMin:
-	add.d $f8, $f10, $f30 # set the curren min (f8) to the new lower value
+	add.d $f8, $f10, $f30 # set the current min (f8) to the new lower value
 	
 keepMin: 
 	addi $t6, $t6, -8 # decrement heap pointer
@@ -291,9 +292,9 @@ max:
 	syscall
 	
 	add $t2, $zero, $zero # t2 is loop counter
-	add.d $f8, $f30, $f30 # cleared sum for some reason
+	add.d $f8, $f30, $f30
 	
-	### Stores -Infinity in $f8 ###
+	### Stores negative infinity in $f8 ###
 	lui $t3, 0xFFF0 
 	ori $t3, 0x0000
 	add $t4, $zero, $zero
@@ -306,11 +307,11 @@ maxLoop:
   	beq $t2, $t1, endMax
 	ldc1 $f10, 0($t6) # load the current input into f10
 	
-    	c.lt.d $f10, $f8 # set floating point conditional to true if input is less than current max
+    	c.lt.d $f10, $f8 # set floating point conditional flag to true if input is less than current max
     	bc1t keepMax # if current min < input don't change the current min
 	
 changeMax:
-	add.d $f8, $f10, $f30 # set the curren max (f8) to the new higher value
+	add.d $f8, $f10, $f30 # set the current max (f8) to the new higher value
 	
 keepMax: 
 	addi $t6, $t6, -8 # decrement heap pointer
@@ -383,12 +384,12 @@ average:
 	syscall
 	
 	add $t2, $zero, $zero # t2 is loop counter
-	add.d $f2, $f30, $f30 # cleared sum 
+	add.d $f2, $f30, $f30
 
 averageLoop:	
 	bge $t2, $t1, divideByTotal
 	ldc1 $f4, 0($t6)
-	add.d $f2, $f2, $f4 # adds current number to sum is in f2
+	add.d $f2, $f2, $f4 # add current number to sum in f2
 	addi $t6, $t6, -8 # move pointer to previous input
 	addi $t2, $t2, 1 # increment loop counter
 	j averageLoop
@@ -413,9 +414,9 @@ medianInit:
     	la $a0, medianMessage  # load desired value into argument register $a0
 	syscall
 	
-	addi $t3, $zero, 2 # two
+	addi $t3, $zero, 2 # store 2 in t3
 	div $t1, $t3 # divide total number of arguments by two
-	mfhi $t3 # the remainder in t3
+	mfhi $t3 # the remainder is in t3
 	mflo $t4 # lo is the quotient
 	add $t7, $t6, $zero # t7 will be the pointer for internal use in the inputs
 	beq $t3, $zero, medianEven # if the remainder is zero there is an even number of arguments
@@ -425,7 +426,7 @@ medianOdd:
 	add $t2, $zero, $zero # t2 is loop counter
 
 medianOddLoop:
-	beq $t2, $t4, setOddMedian # loop until reach index of median
+	beq $t2, $t4, setOddMedian # loop until we reach the index of the median
 	addi $t7, $t7, -8 # change the pointer
 	addi $t2, $t2, 1 # increment loop counter
 	j medianOddLoop
@@ -437,7 +438,7 @@ setOddMedian:
 	
 medianEven:
 	add $t2, $zero, $zero # t2 is loop counter
-	addi $t4, $t4, -1 # have to add one because we want the number after the division
+	addi $t4, $t4, -1 # have to add one because we want the next number after the quotient
 
 medianEvenLoop:
 	beq $t2, $t4, setEvenMedian	
@@ -446,7 +447,7 @@ medianEvenLoop:
 	j medianEvenLoop
 	
 setEvenMedian:
-	addi $t3, $zero, 2 # two
+	addi $t3, $zero, 2 # set t3 to 2
 	ldc1 $f2, 0($t7) # load first value needed for median
 	addi $t7, $t7, -8 # set pointer to second value needed for median
 	ldc1 $f4, 0($t7) # load second value needed for median
@@ -483,14 +484,12 @@ modeLoop:
 	bge $t2, $t1, printModeList
 	ldc1 $f4, 0($t7) # f4 is the current value
 	c.eq.d $f4, $f8
-	bc1f newValue # if the current value is not the same as the last value we looked at 
+	bc1f newValue # branch if the current value is not the same as the last value we looked at 
 	j sameValue
 	
 newValue:
 	add $t4, $zero, $zero # set the current counter to 0; will increment in the next line
-	#sdc1 $f8, 0($s0)
-	#addi $s0, $s0, 8
-	
+		
 sameValue:
 	addi $t4, $t4, 1 #increment the current count
 	
@@ -499,7 +498,7 @@ sameValue:
 	j checkEqual
 	
 counterGreater:
-	add $s0, $zero, $t6 # get rid of all previously stored modes by resettingn the pointer to the modes to print
+	add $s0, $zero, $t6 # get rid of all previously stored modes by resetting the pointer to the modes to print
 	addi $t5, $zero, 1 # set the number of values that need to be printed to 1
 	sdc1 $f4, 0($s0) # make the current value the first value to be printed
 	addi $s0, $s0, 8 # increment the s0 pointer
@@ -540,19 +539,19 @@ scalarMultiplyMatrix:
 	add $t2, $zero, 1 # inner (Column) loop counter
 
 rowMultLoop:
-	beq $t1, $t4, stopMult
+	beq $t1, $t4, stopMult # if we've reached the end of the row, jump to the end; otherwise fall through to column loop
 
 columnMultLoop:
 	bgt $t2, $t3, endRowMultLoop
-	ldc1 $f8, 0($t7)
-	mul.d $f8, $f8, $f2
-	sdc1 $f8, 0($t7)
-	addi $t7, $t7, 8
+	ldc1 $f8, 0($t7)	# load the next value
+	mul.d $f8, $f8, $f2	# multiply by the scalar value
+	sdc1 $f8, 0($t7)	# store the result to the same palce
+	addi $t7, $t7, 8	# update pointers
 	addi $t2, $t2, 1
 	j columnMultLoop
 
 endRowMultLoop:
-	addi $t2, $zero, 1 # inner (Column) loop counter
+	addi $t2, $zero, 1 # increment inner (Column) loop counter
 	addi $t1, $t1, 1
 	j rowMultLoop
 	
@@ -586,7 +585,7 @@ m1RowLoop: # each m1RowLoop makes a whole row of the product
 	beq $t1, $s2, done
 	add $t2, $zero, $zero #t2 is the loop counter for the number of columns in matrix one
 
-m1ColumnLoop: #makes 1/s1 of the value of the product for one row of the product
+m1ColumnLoop: # multiplies corresponding values from each matrix, then adds the result to the appropriate cell of the new matrix
 	beq $t2, $s1, m1ColumnLoopEnd
 	add $t3, $zero, $zero #t3 is the loop counter for the number of columns in matrix 2
 
